@@ -1,0 +1,55 @@
+name: Kali Linux Cloud Server
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/55 * * * *"   # revive automático
+
+jobs:
+  kali:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Instalar dependencias
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          wget curl unzip \
+          xvfb tigervnc-standalone-server \
+          novnc websockify \
+          proot debootstrap \
+          dbus-x11
+
+    - name: Crear Kali Linux rootfs
+      run: |
+        mkdir -p $HOME/kali
+        sudo debootstrap --arch=amd64 kali-rolling $HOME/kali http://http.kali.org/kali
+
+    - name: Entrar a Kali y configurar entorno
+      run: |
+        proot -0 -r $HOME/kali -b /proc -b /sys -b /dev -w /root /bin/bash << 'EOF'
+        apt update
+        apt install -y kali-desktop-xfce xterm sudo dbus-x11
+        useradd -m kali
+        echo "kali:kali" | chpasswd
+        EOF
+
+    - name: Instalar Tailscale
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscaled &
+        sleep 5
+        sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=kali-cloud
+
+    - name: Iniciar escritorio gráfico + noVNC
+      run: |
+        export DISPLAY=:1
+        Xvfb :1 -screen 0 1280x720x16 &
+        vncserver :1 -geometry 1280x720 -SecurityTypes None
+        websockify --web=/usr/share/novnc/ 6080 localhost:5901 &
+
+    - name: Mantener vivo
+      run: |
+        echo "Servidor Kali activo"
+        sleep 6h
