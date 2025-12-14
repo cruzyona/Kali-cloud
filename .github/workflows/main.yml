@@ -35,7 +35,7 @@ jobs:
         echo "kali:kali" | chpasswd
         EOF
 
-    - name: Instalar Tailscale
+ali_kali" |ali_" |ali_" | chpasInst
       run: |
         curl -fsSL https://tailscale.com/install.sh | sh
         sudo tailscaled &
